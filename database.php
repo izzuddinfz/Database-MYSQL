@@ -1,21 +1,36 @@
-function refValues($arr){
-  if (strnatcmp(phpversion(),'5.3') >= 0) {
-    $refs = array();
-    foreach($arr as $key => $value)
-      $refs[$key] = &$arr[$key];
-    return $refs;
-  }
-  return $arr;
-}
+<?php
 
-function insertdatabase($dbname, $dbcols, $dbdatas, $types) {
+// Calling functions
+require 'functions.php';
+
+// Calling dbconnect
+require 'dbconnect.php';
+
+/*
+  Database Manipulation Function
+  Time takken on this function: 220hour
+    - Note: If you trying to edit this functions please update the time takken.
+    - Caution: This things might make whole apps broken. Please bercarefull!
+
+  refvalues($arr)
+  Usage: I forget what it for
+
+  SQL INSERT - insertdatabase($tblname, $dbcols, $dbdatas, $types)
+  SQL SET - updatedatabase($tblname, $dbcols, $dbdatas, $types, $colname, $valueselect, $operator = 'unset')
+  SQL DELETE - deletedatabase($tblname, $colname, $valueselect)
+  SQL SELECT - selectdatabase($tblname, $returntype = 'int', $colname = 'unset', $valueselect  = 'unset', $operator = 'unset', $returnsize = 'unset', $types = 'unset')
+
+*/
+
+// Using INSERT
+function insertdatabase($tblname, $dbcols, $dbdatas, $types) {
   if (count($dbcols) == count($dbdatas)) {
     $conn = dbconnect();
     if ($conn) {
-      $sql = 'INSERT INTO ' . $dbname . ' (' . implode(', ', $dbcols) . ') VALUES (' . str_repeat('?, ', count($dbdatas)-1) . '?)';
+      $sql = 'INSERT INTO ' . $tblname . ' (' . implode(', ', $dbcols) . ') VALUES (' . str_repeat('?, ', count($dbdatas)-1) . '?)';
       if ($stmt = $conn->prepare($sql)) {
         $param = array_merge(array(implode('', $types)), $dbdatas);
-        call_user_func_array(array($stmt, 'bind_param'), refValues($param));
+        call_user_func_array(array($stmt, 'bind_param'), refvalues($param));
         if ($stmt->execute()) {
           return true;
         } else {
@@ -31,17 +46,18 @@ function insertdatabase($dbname, $dbcols, $dbdatas, $types) {
   }
 }
 
-function updatedatabase($dbname, $dbcols, $dbdatas, $types, $keycols, $keydata, $operator = 'AND') {
-  if (is_array($keycols) && (count($keycols) != count($keydata))) {
+// Using SET
+function updatedatabase($tblname, $dbcols, $dbdatas, $types, $colname, $valueselect, $operator = 'unset') {
+  if (is_array($colname) && (count($colname) != count($valueselect))) {
     debugerror('Error occured: Array not match!');
   }
   if (count($dbcols) == count($dbdatas)) {
     $conn = dbconnect();
     if ($conn) {
-      $sql = 'UPDATE ' . $dbname . ' SET ' . implode(' = ?, ', $dbcols) . ' = ? WHERE ' . (is_array($keycols) ? implode(' = ? ' . $operator . ' ', $keycols) : $keycols) . ' = ?';
+      $sql = 'UPDATE ' . $tblname . ' SET ' . implode(' = ?, ', $dbcols) . ' = ? WHERE ' . (is_array($colname) ? implode(' = ? ' . $operator . ' ', $colname) : $colname) . ' = ?';
       if ($stmt = $conn->prepare($sql)) {
-        $param = array_merge_recursive(array(implode('', $types).'s'), $dbdatas, (is_array($keydata) ? $keydata : array($keydata)));
-        call_user_func_array(array($stmt, 'bind_param'), refValues($param));
+        $param = array_merge_recursive(array(implode('', $types).'s'), $dbdatas, (is_array($valueselect) ? $valueselect : array($valueselect)));
+        call_user_func_array(array($stmt, 'bind_param'), refvalues($param));
         if ($stmt->execute()) {
           return true;
         } else {
@@ -57,12 +73,13 @@ function updatedatabase($dbname, $dbcols, $dbdatas, $types, $keycols, $keydata, 
   }
 }
 
-function deletedatabase($dbname, $keycols, $keydata) {
+// Using DELETE
+function deletedatabase($tblname, $colname, $valueselect) {
   $conn = dbconnect();
   if ($conn) {
-    $sql = 'DELETE FROM ' . $dbname . ' WHERE ' . $keycols . ' = ?';
+    $sql = 'DELETE FROM ' . $tblname . ' WHERE ' . $colname . ' = ?';
     if ($stmt = $conn->prepare($sql)) {
-      $stmt->bind_param('s', $keydata);
+      $stmt->bind_param('s', $valueselect);
       if ($stmt->execute()) {
         return true;
       } else {
@@ -75,20 +92,21 @@ function deletedatabase($dbname, $keycols, $keydata) {
   dbclose($conn);
 }
 
-function selectdatabase($dbname, $returntype = 'int', $keycols = 'unset', $keydata  = 'unset', $operator = 'AND', $returnsize = 'plural', $types = 'unset') {
+// Using SELECT
+function selectdatabase($tblname, $returntype = 'int', $colname = 'unset', $valueselect  = 'unset', $operator = 'unset', $returnsize = 'unset', $types = 'unset') {
   $conn = dbconnect();
   if ($conn) {
-    $sql = 'SELECT * FROM ' . $dbname;
-    if ($keycols != 'unset') {
-      $sql .= ' WHERE ' . (is_array($keycols) ? implode(' = ? ' . $operator . ' ', $keycols) : $keycols) . ' = ?';
+    $sql = 'SELECT * FROM ' . $tblname;
+    if ($colname != 'unset') {
+      $sql .= ' WHERE ' . (is_array($colname) ? implode(' = ? ' . $operator . ' ', $colname) : $colname) . ' = ?';
     }
     if ($stmt = $conn->prepare($sql)) {
-      if ($keycols != 'unset') {
-        if (is_array($keycols)) {
-          $param = array_merge(array(implode('', $types)), $keydata);
-          call_user_func_array(array($stmt, 'bind_param'), refValues($param));
+      if ($colname != 'unset') {
+        if (is_array($colname)) {
+          $param = array_merge(array(implode('', $types)), $valueselect);
+          call_user_func_array(array($stmt, 'bind_param'), refvalues($param));
         } else {
-          $stmt->bind_param('s', $keydata);
+          $stmt->bind_param('s', $valueselect);
         }
       }
       if ($stmt->execute()) {
@@ -98,21 +116,28 @@ function selectdatabase($dbname, $returntype = 'int', $keycols = 'unset', $keyda
           return $recordnum;
         } elseif ($returntype == 'array') {
           $metadata = $stmt->result_metadata()->fetch_fields();
-          $params = array();
-          $values = array();
-          foreach ($metadata as $object) {
-            $params[] = &$values[$object->orgname];
-          }
-          call_user_func_array(array($stmt, 'bind_result'), $params);
-          $stmt->fetch();
-          $recordcount = 0;
-          if ($keycols != 'unset') {
+          if ($colname == 'unset' || $returnsize == 'plural') {
+            $recordcount = 0;
             while ($recordcount < $recordnum) {
-              $arrayval[$recordcount] = $values;
+              $params = array();
+              $values = array();
+              foreach ($metadata as $object) {
+                $params[] = &$values[$object->orgname];
+              }
+              call_user_func_array(array($stmt, 'bind_result'), $params);
+              $stmt->fetch();
+              $arrayval[$tblname . 'Row' . $recordcount] = $values;
               $recordcount++;
             }
             return $arrayval;
           } else {
+            $params = array();
+            $values = array();
+            foreach ($metadata as $object) {
+              $params[] = &$values[$object->orgname];
+            }
+            call_user_func_array(array($stmt, 'bind_result'), $params);
+            $stmt->fetch();
             return $values;
           }
           $stmt->free_result();
